@@ -68,27 +68,51 @@ function gameTick() {
     let aliveCount = 0;
     let lastAlive = null;
 
-    // Process movements
+    // Process movements and decays
     for (let id in players) {
         let p = players[id];
-        if (!p.alive) continue;
 
-        // Mark current spot as trail
-        grid[p.x][p.y] = p.color;
+        if (p.alive) {
+            // ALIVE: Mark current spot as a wall and save it to their trail history
+            grid[p.x][p.y] = p.color;
+            p.trail.push({ x: p.x, y: p.y });
 
-        // Move
-        p.x += p.dirX;
-        p.y += p.dirY;
+            // Move forward
+            p.x += p.dirX;
+            p.y += p.dirY;
 
-        // Check Collisions
-        if (p.x < 0 || p.x >= COLS || p.y < 0 || p.y >= ROWS || grid[p.x][p.y] !== 0) {
-            p.alive = false;
-            io.emit('playerCrashed', { id: p.id, x: p.x, y: p.y, color: p.color });
+            // Check Collisions
+            if (p.x < 0 || p.x >= COLS || p.y < 0 || p.y >= ROWS || grid[p.x][p.y] !== 0) {
+                p.alive = false;
+                io.emit('playerCrashed', { id: p.id, x: p.x, y: p.y, color: p.color });
+            } else {
+                aliveCount++;
+                lastAlive = p;
+            }
         } else {
-            aliveCount++;
-            lastAlive = p;
+            // DEAD: Slowly dissolve their trail so others can pass through
+            if (p.trail && p.trail.length > 0) {
+                // Erase 3 blocks per server tick (adjust this number to make it fade faster/slower)
+                let fadeSpeed = 3; 
+                for (let i = 0; i < fadeSpeed && p.trail.length > 0; i++) {
+                    let oldPos = p.trail.shift(); // Grab the oldest block from the tail end
+                    grid[oldPos.x][oldPos.y] = 0; // Erase it from the physical collision grid
+                }
+            }
         }
     }
+
+    // Send the updated authoritative grid to everyone's browser
+    io.emit('gameState', { players, grid });
+
+    // Check Round Over condition
+    if (aliveCount <= 1 && gameState === 'PLAYING') {
+        clearInterval(gameInterval);
+        gameState = 'ROUND_OVER';
+        let winnerName = lastAlive ? lastAlive.name : "Draw - Mutual Destruction";
+        io.emit('roundOver', { winner: winnerName });
+    }
+}
 
     io.emit('gameState', { players, grid });
 
