@@ -49,8 +49,10 @@ function startRound() {
             dirX: 1,
             dirY: 0,
             alive: true
+            trail: [] // <-- ADD THIS LINE
         };
     });
+
 
     io.emit('gameStart', { round, players, cols: COLS, rows: ROWS });
 
