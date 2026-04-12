@@ -48,7 +48,7 @@ function startRound() {
             y: Math.floor(ROWS * ((index + 1) / (activePlayers.length + 1))),
             dirX: 1,
             dirY: 0,
-            alive: true
+            alive: true,
             trail: [] // <-- ADD THIS LINE
         };
     });
