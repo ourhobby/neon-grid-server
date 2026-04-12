@@ -111,11 +111,17 @@ io.on('connection', (socket) => {
         io.emit('lobbyUpdate', lobby);
     });
 
-    socket.on('startMatch', () => {
-        if (gameState === 'LOBBY' && lobby.length >= 2) {
-            startRound();
-        }
-    });
+socket.on('startMatch', () => {
+    console.log(`[SERVER] Start Match received. Current State: ${gameState} | Players in array: ${lobby.length}`);
+    
+    // Bypassing the gameState check so we can force-restart if needed
+    if (lobby.length >= 2) {
+        console.log(`[SERVER] Initiating Grid Sequence...`);
+        startRound();
+    } else {
+        console.log(`[SERVER] Ignored: Not enough players registered on the server.`);
+    }
+});
 
     socket.on('changeDirection', (dir) => {
         let p = players[socket.id];
