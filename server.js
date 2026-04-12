@@ -4,6 +4,8 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
+
+// VIP List for GoDaddy
 const io = new Server(server, {
     cors: {
         origin: "*", 
@@ -13,17 +15,22 @@ const io = new Server(server, {
 
 app.use(express.static('public'));
 
+// Removes the "Cannot GET /" error on Render
+app.get('/', (req, res) => {
+    res.send('Neon Grid Multiplayer Engine is Online!');
+});
+
 // Game Constants
 const COLS = 100;
 const ROWS = 75;
 const COLORS = ['#00ffff', '#ff00ff', '#00ff00', '#ffaa00', '#ff0000', '#ffff00', '#0000ff'];
 
 // State
-let lobby = []; // Array of { id, name }
-let players = {}; // Active game players
+let lobby = []; 
+let players = {}; 
 let grid = [];
 let gameInterval = null;
-let gameState = 'LOBBY'; // LOBBY, PLAYING, ROUND_OVER
+let gameState = 'LOBBY'; 
 let round = 1;
 
 function initGrid() {
@@ -31,14 +38,12 @@ function initGrid() {
 }
 
 function startRound() {
-    if (lobby.length < 2) return; // Need at least 2 players
-    
     gameState = 'PLAYING';
     initGrid();
     players = {};
     
     // Spawn players
-    let activePlayers = lobby.slice(0, 7); // Max 7 players
+    let activePlayers = lobby.slice(0, 7); 
     activePlayers.forEach((p, index) => {
         players[p.id] = {
             id: p.id,
@@ -49,10 +54,9 @@ function startRound() {
             dirX: 1,
             dirY: 0,
             alive: true,
-            trail: [] // <-- ADD THIS LINE
+            trail: [] // The Trail Memory
         };
     });
-
 
     io.emit('gameStart', { round, players, cols: COLS, rows: ROWS });
 
@@ -60,7 +64,7 @@ function startRound() {
     
     // Wait for countdown before moving
     setTimeout(() => {
-        gameInterval = setInterval(gameTick, 80); // Game Speed
+        gameInterval = setInterval(gameTick, 80); 
     }, 3000);
 }
 
@@ -68,16 +72,16 @@ function gameTick() {
     let aliveCount = 0;
     let lastAlive = null;
 
-    // Process movements and decays
+    // Process movements
     for (let id in players) {
         let p = players[id];
 
         if (p.alive) {
-            // ALIVE: Mark current spot as a wall and save it to their trail history
+            // Mark current spot as trail
             grid[p.x][p.y] = p.color;
             p.trail.push({ x: p.x, y: p.y });
 
-            // Move forward
+            // Move
             p.x += p.dirX;
             p.y += p.dirY;
 
@@ -90,34 +94,21 @@ function gameTick() {
                 lastAlive = p;
             }
         } else {
-            // DEAD: Slowly dissolve their trail so others can pass through
+            // Slowly dissolve dead player's trail
             if (p.trail && p.trail.length > 0) {
-                // Erase 3 blocks per server tick (adjust this number to make it fade faster/slower)
                 let fadeSpeed = 3; 
                 for (let i = 0; i < fadeSpeed && p.trail.length > 0; i++) {
-                    let oldPos = p.trail.shift(); // Grab the oldest block from the tail end
-                    grid[oldPos.x][oldPos.y] = 0; // Erase it from the physical collision grid
+                    let oldPos = p.trail.shift(); 
+                    grid[oldPos.x][oldPos.y] = 0; 
                 }
             }
         }
     }
 
-    // Send the updated authoritative grid to everyone's browser
     io.emit('gameState', { players, grid });
 
     // Check Round Over condition
     if (aliveCount <= 1 && gameState === 'PLAYING') {
-        clearInterval(gameInterval);
-        gameState = 'ROUND_OVER';
-        let winnerName = lastAlive ? lastAlive.name : "Draw - Mutual Destruction";
-        io.emit('roundOver', { winner: winnerName });
-    }
-}
-
-    io.emit('gameState', { players, grid });
-
-    // Check Round Over condition
-    if (aliveCount <= 1) {
         clearInterval(gameInterval);
         gameState = 'ROUND_OVER';
         let winnerName = lastAlive ? lastAlive.name : "Draw - Mutual Destruction";
@@ -133,21 +124,22 @@ io.on('connection', (socket) => {
             socket.emit('lobbyFull');
             return;
         }
-        lobby.push({ id: socket.id, name: name || 'Unknown' });
+        // Make sure we don't duplicate players if they reconnect
+        if (!lobby.find(p => p.id === socket.id)) {
+            lobby.push({ id: socket.id, name: name || 'Unknown' });
+        }
         io.emit('lobbyUpdate', lobby);
     });
 
-socket.on('startMatch', () => {
-    console.log(`[SERVER] Start Match received. Current State: ${gameState} | Players in array: ${lobby.length}`);
-    
-    // Bypassing the gameState check so we can force-restart if needed
-    if (lobby.length >= 2) {
-        console.log(`[SERVER] Initiating Grid Sequence...`);
-        startRound();
-    } else {
-        console.log(`[SERVER] Ignored: Not enough players registered on the server.`);
-    }
-});
+    socket.on('startMatch', () => {
+        console.log(`[SERVER] Start Match received. Players in lobby: ${lobby.length}`);
+        if (lobby.length >= 2) {
+            console.log(`[SERVER] Initiating Grid Sequence...`);
+            startRound();
+        } else {
+            console.log(`[SERVER] Ignored: Not enough players.`);
+        }
+    });
 
     socket.on('changeDirection', (dir) => {
         let p = players[socket.id];
@@ -168,7 +160,7 @@ socket.on('startMatch', () => {
     socket.on('exitToLobby', () => {
         if (gameState === 'ROUND_OVER') {
             gameState = 'LOBBY';
-            io.emit('lobbyUpdate', lobby); // Kick everyone back to lobby UI
+            io.emit('lobbyUpdate', lobby); 
         }
     });
 
@@ -181,5 +173,5 @@ socket.on('startMatch', () => {
 });
 
 server.listen(3000, () => {
-    console.log('Global Thermonuclear War (Grid Server) running on http://localhost:3000');
+    console.log('Global Thermonuclear War (Grid Server) running on port 3000');
 });
