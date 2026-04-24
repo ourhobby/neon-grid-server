@@ -1,13 +1,19 @@
 // File: games/chess.js
 module.exports = function(io) {
     const chessSpace = io.of('/chess');
-    let waitingPlayer = null; // Holds a player until a second one joins
+    let waitingPlayer = null; 
+
+    console.log("♟️ Chess multiplayer module loaded!");
 
     chessSpace.on('connection', (socket) => {
+        console.log(`⚡ New connection attempt: ${socket.id}`);
         
         socket.on('findMatch', (userName) => {
+            console.log(`🔍 Player [${userName}] is looking for a match.`);
+
             if (waitingPlayer && waitingPlayer.id !== socket.id) {
-                // We have two players! Create a unique room for them.
+                console.log(`✅ Match found! Pairing ${waitingPlayer.userName} with ${userName}`);
+                
                 const roomName = 'chess_room_' + waitingPlayer.id;
                 
                 socket.join(roomName);
@@ -19,24 +25,24 @@ module.exports = function(io) {
 
                 waitingPlayer = null; // Clear the waiting slot
             } else {
-                // Nobody is waiting, so this player becomes the waiting player
+                console.log(`⏳ No one is waiting. Putting [${userName}] in the queue.`);
                 waitingPlayer = socket;
                 waitingPlayer.userName = userName;
                 socket.emit('waitingForOpponent');
             }
         });
 
-        // When a player makes a move, relay it to the other person in their room
         socket.on('makeMove', (data) => {
-            // data should include { room: '...', move: '...', fen: '...' }
+            console.log(`♟️ Move made in room ${data.room}: ${data.move.san}`);
             socket.to(data.room).emit('opponentMove', data);
         });
 
         socket.on('disconnect', () => {
+            console.log(`❌ Player disconnected: ${socket.id}`);
             if (waitingPlayer && waitingPlayer.id === socket.id) {
+                console.log("🧹 Clearing waiting player because they left.");
                 waitingPlayer = null;
             }
-            // You can add logic here to emit an 'opponentLeft' message to the room
         });
     });
 };
