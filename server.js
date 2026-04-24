@@ -15,8 +15,11 @@ app.get('/', (req, res) => {
 });
 
 // Load the individual game modules
-require('./games/neon-grid')(io);
+//require('./games/neon-grid')(io);
 require('./games/chess')(io);
+
+
+
 
 server.listen(3000, () => {
     console.log('Arcade Server running on port 3000');
