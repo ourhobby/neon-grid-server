@@ -15,7 +15,7 @@ app.get('/', (req, res) => {
 });
 
 // Load the individual game modules
-//require('./games/neon-grid')(io);
+require('./games/neon-grid')(io);
 require('./games/chess')(io);
 
 
